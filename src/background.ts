@@ -1,10 +1,9 @@
-import { fromByteArray, toByteArray } from "base64-js";
 import { pageCapture } from "./capture";
 import { getOptions } from "./options";
 import { render } from "./render";
 import { getTab } from "./status";
 import { upload } from "./upload";
-import { safeFilename, sleep, errString } from "./utils";
+import { safeFilename, sleep } from "./utils";
 
 async function saveMHTMLForDebug(
   tabId: number,
@@ -59,7 +58,7 @@ async function rePub(tabId: number) {
     // upload
     if (outputStyle === "download") {
       console.log('[background] Starting download');
-      await downloadEpub(tabId, safeFilename(title), new Uint8Array(epub));
+      await downloadEpub(tabId, safeFilename(title), new Uint8Array(epub), downloadAsk);
       console.log('[background] Download completed');
     } else if (deviceToken) {
       console.log('[background] Starting upload');
@@ -68,8 +67,10 @@ async function rePub(tabId: number) {
     } else {
       console.log('[background] No device token, opening options page');
       void browser.runtime.openOptionsPage();
-      throw new Error(
-        "must be authenticated to upload documents to reMarkable",
+      await Promise.reject(
+        new Error(
+          "must be authenticated to upload documents to reMarkable",
+        )
       );
     }
 
@@ -78,7 +79,7 @@ async function rePub(tabId: number) {
   } catch (ex) {
     console.error('[background] Error occurred:', ex);
     const msg = ex instanceof Error ? ex.toString() : "unknown error";
-    browser.notifications.create({
+    await browser.notifications.create({
       type: "basic",
       iconUrl: "images/repub_128.png",
       title: "Conversion to epub failed",
@@ -100,6 +101,7 @@ async function downloadEpub(
   tabId: number,
   filename: string,
   data: Uint8Array,
+  saveAs: boolean = true,
 ): Promise<void> {
   console.log('[background] Starting downloadEpub');
   const blob = new Blob([data], { type: "application/epub+zip" });
@@ -107,8 +109,8 @@ async function downloadEpub(
   try {
     await browser.downloads.download({
       url,
-      filename: `${safeFilename(filename)}.epub`,
-      saveAs: true,
+      filename: `${filename}.epub`,
+      saveAs,
     });
   } finally {
     URL.revokeObjectURL(url);

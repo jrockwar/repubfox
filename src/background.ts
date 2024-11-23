@@ -5,27 +5,6 @@ import { getTab } from "./status";
 import { upload } from "./upload";
 import { safeFilename, sleep } from "./utils";
 
-async function saveMHTMLForDebug(
-  tabId: number,
-  data: ArrayBuffer,
-  prefix: string = 'debug'
-): Promise<void> {
-  console.log('[debug] Saving MHTML for inspection');
-  const blob = new Blob([data], { type: "message/rfc822" });
-  const url = URL.createObjectURL(blob);
-  try {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    await browser.downloads.download({
-      url,
-      filename: `${prefix}_${timestamp}.mhtml`,
-      saveAs: false,
-    });
-    console.log('[debug] MHTML saved successfully');
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
 /**
  * create and upload epub
  */
@@ -46,9 +25,6 @@ async function rePub(tabId: number) {
     const mhtml = await pageCapture(tabId);
     await tab.progress(50);
     console.log('[background] Page captured successfully');
-
-    // Save MHTML for debugging
-    await saveMHTMLForDebug(tabId, mhtml, 'before_render');
 
     console.log('[background] Starting render');
     const { epub, title = "missing title" } = await render(mhtml, opts);

@@ -1,16 +1,12 @@
-import { fromByteArray, toByteArray } from "base64-js";
 import { generate } from "./lib";
 import { brighten } from "./image";
 import { EpubOptions } from "./options";
-
-let num = 0;
 
 export async function render(
   mhtml: ArrayBuffer,
   opts: EpubOptions,
 ): Promise<{ epub: Uint8Array; title?: string }> {
   console.log('[render] Starting render process');
-  num++;
   try {
     console.log('[render] Processing MHTML directly');
     const mhtmlStr = new TextDecoder().decode(new Uint8Array(mhtml).slice(0, 500));
@@ -26,8 +22,5 @@ export async function render(
     console.error('[render] Error in render process:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to render document: ${errorMessage}`);
-  } finally {
-    num--;
-    console.log('[render] Render process completed');
   }
 }

@@ -40,7 +40,7 @@ export async function parse(data: Uint8Array): Promise<ParsedWebpage> {
     "content file location didn't match header location",
   );
   
-  // Check Content-Type more flexibly to allow charset parameter
+  // Check Content-Type with flexible parameter handling
   const contentType = second.value.headers.get("Content-Type");
   assert(
     contentType?.startsWith("text/html"),

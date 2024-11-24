@@ -1,8 +1,9 @@
 {
   "name": "rePubFox",
   "description": "Converts web pages to epub for remarkable tablet",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "manifest_version": 3,
+  "license": "MIT",
   "permissions": [
     "tabs",
     "activeTab",

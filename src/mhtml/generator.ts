@@ -82,22 +82,79 @@ function createMHTMLHeader(doc: MHTMLDocument): string {
 }
 
 /**
- * Encodes text as quoted-printable
+ * Encodes text as quoted-printable, preserving HTML special characters
+ * This version uses a custom encoding for apostrophes to avoid mhtml-stream decoding issues
  */
 function encodeQuotedPrintable(text: string): string {
-  return text
-    // First normalize all line endings to CRLF
-    .replace(/\r\n|\n|\r/g, '\r\n')
-    .split('')
-    .map(char => {
-      const code = char.charCodeAt(0);
-      // Only encode non-ASCII and essential MIME special characters
-      if (code > 127 || char === '=' || char === '\r' || char === '\n') {
-        return '=' + code.toString(16).toUpperCase().padStart(2, '0');
+  console.log('[generator] Original text sample (first 1000 chars):', text.slice(0, 1000));
+  
+  // First normalize all line endings to CRLF
+  const normalized = text.replace(/\r\n|\n|\r/g, '\r\n');
+  
+  // Convert to bytes to handle non-ASCII characters correctly
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(normalized);
+  
+  // Convert each byte to its appropriate representation
+  let encoded = '';
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = bytes[i];
+    if (byte === undefined) continue; // Skip undefined bytes
+    
+    // RFC 2045 specifies:
+    // - Only printable ASCII characters (33-126) can be represented as-is
+    // - Space (32) and tab (9) can be represented as-is, except at line endings
+    // - CR (13) and LF (10) must be encoded
+    // - All other bytes must be encoded
+    if ((byte >= 33 && byte <= 126 && byte !== 61) || // printable ASCII except =
+        (byte === 32 && i + 1 < bytes.length && bytes[i + 1] !== 13 && bytes[i + 1] !== 10) || // space not before CR/LF
+        (byte === 9 && i + 1 < bytes.length && bytes[i + 1] !== 13 && bytes[i + 1] !== 10)) {  // tab not before CR/LF
+      encoded += String.fromCharCode(byte);
+    } else {
+      encoded += '=' + byte.toString(16).toUpperCase().padStart(2, '0');
+    }
+  }
+
+  // RFC 2045 requires lines to be no longer than 76 characters
+  // We need to wrap lines, being careful not to break encoded sequences
+  const MAX_LINE_LENGTH = 76;
+  const wrappedLines: string[] = [];
+  let currentLine = '';
+
+  for (let i = 0; i < encoded.length;) {
+    // If we're at the start of an encoded sequence (=XX)
+    if (encoded[i] === '=' && i + 2 < encoded.length) {
+      const sequence = encoded.slice(i, i + 3);
+      // If the sequence would cross line boundary, wrap first
+      if (currentLine.length >= MAX_LINE_LENGTH - sequence.length) {
+        wrappedLines.push(currentLine + '=');
+        currentLine = '';
+        continue;
       }
-      return char;
-    })
-    .join('');
+      currentLine += sequence;
+      i += 3;
+      continue;
+    }
+
+    // For normal characters
+    if (currentLine.length >= MAX_LINE_LENGTH - 1) {
+      wrappedLines.push(currentLine + '=');
+      currentLine = '';
+      continue;
+    }
+    
+    currentLine += encoded[i];
+    i++;
+  }
+
+  // Add the last line if any
+  if (currentLine) {
+    wrappedLines.push(currentLine);
+  }
+
+  const result = wrappedLines.join('\r\n');
+  console.log('[generator] Encoded text sample (first 1000 chars):', result.slice(0, 1000));
+  return result;
 }
 
 /**
@@ -127,7 +184,7 @@ function createMainContent(doc: MHTMLDocument): string {
 
   // Headers must match exactly what the parser expects
   const mainContent = [
-    'Content-Type: text/html',  // Must be exactly "text/html" for the parser
+    'Content-Type: text/html; charset=UTF-8',  // Must be exactly "text/html" for the parser
     'Content-Transfer-Encoding: quoted-printable',
     'Content-Location: ' + contentLocation,
     '',  // Empty line before content

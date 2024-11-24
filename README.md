@@ -1,7 +1,6 @@
 # rePub
 
 [![build](https://github.com/hafaio/repub/actions/workflows/build.yml/badge.svg)](https://github.com/hafaio/repub/actions/workflows/build.yml)
-[![chrome](https://img.shields.io/badge/chrome-extension-orange)](https://chrome.google.com/webstore/detail/repub/blkjpagbjaekkpojgcgdapmikoaolpbl)
 [![license](https://img.shields.io/github/license/hafaio/repub)](LICENSE)
 
 A reMarkable ePub generator. This is essentially an open source version of

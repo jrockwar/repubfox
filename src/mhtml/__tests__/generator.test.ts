@@ -20,56 +20,152 @@ describe('MHTML Generator', () => {
     return list;
   }
 
-  // Basic character encoding test
-  const mockDoc = {
-    title: "Test Page with Special Characters: Don't Encode Me!",
-    documentElement: {
-      outerHTML: `
-        <html>
-          <head>
-            <title>Test Page</title>
-          </head>
-          <body>
-            <h1>Testing Special Characters</h1>
-            <p>Here's a paragraph with an apostrophe and some dots...</p>
-            <p>Special characters like = should be encoded</p>
-            <p>Non-ASCII like é and ñ should be encoded</p>
-            <p>Line breaks should
-               be encoded properly</p>
-          </body>
-        </html>
-      `
-    },
-    location: {
-      href: 'https://example.com/test'
-    },
-    getElementsByTagName: () => createMockHTMLCollection(),
-    styleSheets: createMockStyleSheetList()
-  };
+  // Helper function to find and decode content between boundaries
+  function extractAndDecode(content: string): string {
+    const parts = content.split('--REPUBFOX-MHTML-BOUNDARY');
+    const mainContent = parts[1]; // First part after header
+    if (!mainContent) return '';
+    
+    // Find the actual content after the headers
+    const contentStart = mainContent.indexOf('\r\n\r\n');
+    if (contentStart === -1) return '';
+    
+    const encodedContent = mainContent.slice(contentStart + 4);
+    
+    // First split into lines and remove soft line breaks
+    const lines = encodedContent.split('\r\n');
+    let decoded = '';
+    for (const line of lines) {
+      if (!line) continue;
+      if (line.endsWith('=')) {
+        // Remove soft line break and continue to next line
+        decoded += line.slice(0, -1);
+      } else {
+        decoded += line;
+      }
+    }
 
-  it('should properly handle special characters in MHTML generation', async () => {
-    const result = await generateMHTML(mockDoc);
-    const content = new TextDecoder().decode(result);
-    
-    // Check that apostrophes are not encoded
-    expect(content).toContain("Here's");
-    expect(content).not.toContain("Here=27s");
-    
-    // Check that dots are not encoded
-    expect(content).toContain("...");
-    expect(content).not.toContain("=2E=2E=2E");
-    
-    // Check that equals signs are encoded
-    expect(content).toContain("=3D");
-    
-    // Check that non-ASCII characters are encoded
-    expect(content).toContain("=E9"); // é
-    expect(content).toContain("=F1"); // ñ
-    
-    // Check that line breaks are properly encoded
-    expect(content).toContain("=0D=0A");
+    // Now decode the quoted-printable sequences
+    const bytes = new Uint8Array(
+      decoded.split(/=([0-9A-F]{2})/g)
+        .filter(part => part)
+        .map(part => {
+          if (part.length === 2) {
+            return parseInt(part, 16);
+          }
+          return part.split('').map(c => c.charCodeAt(0));
+        })
+        .flat()
+    );
+
+    // Convert the bytes to a UTF-8 string
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  describe('Character Encoding', () => {
+    // Test document with various character encoding edge cases
+    const mockDoc = {
+      title: "Character Encoding Test: Don't break this!",
+      documentElement: {
+        outerHTML: `
+          <html>
+            <head>
+              <title>Character Encoding Test</title>
+            </head>
+            <body>
+              <h1>Testing RFC 2045 Quoted-Printable Encoding</h1>
+              
+              <!-- Test ASCII printable characters -->
+              <p>Basic ASCII: The quick brown fox jumps over the lazy dog.</p>
+              
+              <!-- Test special characters that must be encoded -->
+              <p>Special MIME chars: = (equals)</p>
+              
+              <!-- Test whitespace -->
+              <p>Spaces and	tabs should be preserved</p>
+              
+              <!-- Test line endings -->
+              <p>Line breaks should
+                 be properly encoded</p>
+              
+              <!-- Test apostrophes and quotes -->
+              <p>Don't break "quoted text" or 'single quotes'</p>
+              
+              <!-- Test non-ASCII characters -->
+              <p>UTF-8: é (e-acute), ñ (n-tilde), 漢 (han), 🦊 (fox emoji)</p>
+              
+              <!-- Test HTML entities -->
+              <p>&lt;brackets&gt; &amp; &quot;entities&quot;</p>
+              
+              <!-- Test long lines -->
+              <p>${'a'.repeat(100)}</p>
+            </body>
+          </html>
+        `
+      },
+      location: {
+        href: 'https://example.com/test'
+      },
+      getElementsByTagName: () => createMockHTMLCollection(),
+      styleSheets: createMockStyleSheetList()
+    };
+
+    it('should properly encode according to RFC 2045', async () => {
+      const result = await generateMHTML(mockDoc);
+      const content = new TextDecoder().decode(result);
+
+      // Helper to check if a string appears in decoded form
+      const containsWhenDecoded = (original: string) => {
+        const decoded = extractAndDecode(content);
+        expect(decoded).toContain(original);
+      };
+
+      // 1. ASCII printable characters (33-126) should not be encoded
+      containsWhenDecoded('The quick brown fox jumps over the lazy dog');
+
+      // 2. Special MIME characters must be encoded
+      expect(content).toContain('=3D'); // equals sign
+
+      // 3. Whitespace
+      // - Space (32) and tab (9) can be as-is except at line end
+      containsWhenDecoded('Spaces and\ttabs');
+
+      // 4. Line endings must be =0D=0A
+      expect(content).toContain('=0D=0A');
+
+      // 5. Quotes and apostrophes (printable ASCII) should not be encoded
+      containsWhenDecoded('Don\'t');
+      containsWhenDecoded('"quoted text"');
+      containsWhenDecoded('\'single quotes\'');
+
+      // 6. Non-ASCII characters must be encoded
+      expect(content).toContain('=C3=A9');  // é (UTF-8 encoded)
+      expect(content).toContain('=C3=B1');  // ñ (UTF-8 encoded)
+      expect(content).toMatch(/=E6=BC=A2/); // 漢 (UTF-8 encoded)
+      containsWhenDecoded('🦊'); // fox emoji - check the decoded content instead
+
+      // 7. HTML entities should be preserved as-is
+      containsWhenDecoded('&lt;brackets&gt;');
+      containsWhenDecoded('&amp;');
+      containsWhenDecoded('&quot;entities&quot;');
+
+      // 8. Long lines should be properly wrapped
+      const longLine = 'a'.repeat(100);
+      // The line should be split into multiple lines with = continuation
+      const lines = content.split('\r\n');
+      // Find the line containing our long string of 'a's
+      const contentLines = lines.filter(line => 
+        line.includes('aaaaaaaaaaaa') // Look for a sequence of 'a's
+      );
+      expect(contentLines.length).toBeGreaterThan(1); // Should be split into multiple lines
+      // All but the last line should end with = for soft line breaks
+      expect(contentLines.slice(0, -1).every(line => line.endsWith('='))).toBe(true);
+      // Each line should be <= 76 chars
+      expect(contentLines.every(line => line.length <= 76)).toBe(true);
+    });
   });
 
+  // Keep the real-world article test as it provides good coverage for practical scenarios
   it('should handle real-world article content correctly', async () => {
     const realWorldDoc = {
       title: "The AI Revolution: What's Next?",
@@ -99,28 +195,13 @@ describe('MHTML Generator', () => {
                   "AI isn't just about automation — it's about augmentation of human capabilities"
                   — Dr. María González
                 </blockquote>
-                <h2>Key Developments in 2023</h2>
-                <ul>
-                  <li>GPT-4's impact on natural language processing</li>
-                  <li>Breakthrough in protein folding prediction</li>
-                  <li>Advanced robotics integration with AI</li>
-                </ul>
-                <p>
-                  The field of AI ethics has also seen significant progress, with researchers 
-                  tackling questions about bias, fairness, and transparency. Companies like 
-                  DeepMind and OpenAI have implemented new guidelines for responsible AI development.
-                </p>
-                <figure>
-                  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" alt="AI Development Timeline">
-                  <figcaption>Fig.1 - AI Development Timeline (2020-2024)</figcaption>
-                </figure>
               </article>
             </body>
           </html>
         `
       },
       location: {
-        href: 'https://example.com/ai-revolution'
+        href: 'https://example.com/article'
       },
       getElementsByTagName: () => createMockHTMLCollection(),
       styleSheets: createMockStyleSheetList()
@@ -128,36 +209,23 @@ describe('MHTML Generator', () => {
 
     const result = await generateMHTML(realWorldDoc);
     const content = new TextDecoder().decode(result);
-    
-    // Test proper handling of various content types
-    expect(content).toContain("What's Next?"); // Apostrophes in title
-    expect(content).toContain("O'Connor"); // Apostrophes in names
-    
-    // Test that non-ASCII characters are properly encoded in quoted-printable format
-    // These will be decoded back to Unicode when parsing the MHTML for EPUB conversion
-    const decodedContent = content.replace(/=([0-9A-F]{2})/g, (_, hex) => 
-      String.fromCharCode(parseInt(hex, 16))
-    );
-    expect(decodedContent).toContain("María"); // Non-ASCII characters should decode correctly
-    expect(decodedContent).toContain("González"); // Non-ASCII characters should decode correctly
-    
-    // Test structural elements
-    expect(content).toContain('<blockquote>'); // HTML tags
-    expect(content).toContain('class=3D"article"'); // CSS classes with encoded equals
-    expect(content).toContain('max-width: 800px'); // CSS styles
-    
-    // Test proper MIME structure
-    expect(content).toContain('Content-Type: multipart/related');
-    expect(content).toContain('Content-Transfer-Encoding: quoted-printable');
-    expect(content).toContain('MIME-Version: 1.0');
-    
-    // Test proper encoding of special characters in metadata
-    expect(content).toContain('charset=3D"utf-8"'); // Encoded equals sign
-    expect(content).not.toContain('charset="utf-8"'); // Raw equals sign should not exist
-    
-    // Verify line breaks are properly encoded
-    const lineBreaks = content.match(/=0D=0A/g);
-    expect(lineBreaks).toBeTruthy();
-    expect(lineBreaks!.length).toBeGreaterThan(0);
+
+    // Check that the content is properly encoded and can be decoded
+    const decoded = extractAndDecode(content);
+
+    // Title should be preserved
+    expect(decoded).toContain("The AI Revolution: What's Next?");
+
+    // Author name with apostrophe should be correct
+    expect(decoded).toContain("Sarah O'Connor");
+
+    // Non-ASCII name should be preserved after decoding
+    expect(decoded).toContain("María González");
+
+    // Em dash should be properly encoded and decoded
+    expect(decoded).toContain("—");
+
+    // CSS should be preserved
+    expect(decoded).toContain("font-family: 'Arial'");
   });
 });

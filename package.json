@@ -1,7 +1,7 @@
 {
   "name": "repubfox",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": "git@github.com:jrockwar/repubfox.git",
   "author": "Jose Pena <josepenaguerra@gmail.com>",
   "license": "MIT",

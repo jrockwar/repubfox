@@ -25,6 +25,7 @@ async function* asIterable(
 }
 
 export async function parse(data: Uint8Array): Promise<ParsedWebpage> {
+  console.log('[parse] Starting MHTML parsing');
   // init
   const files = parseMhtml(asIterable(data));
 
@@ -47,7 +48,14 @@ export async function parse(data: Uint8Array): Promise<ParsedWebpage> {
     "content file wasn't an html file",
   );
 
+  // Debug: Log the raw content before decoding
+  const rawContent = new TextDecoder().decode(second.value.content.slice(0, 1000));
+  console.log('[parse] Raw content (first 1000 bytes):', rawContent);
+
   const domString = decoder.decode(second.value.content);
+  
+  // Debug: Log the decoded content
+  console.log('[parse] Decoded content (first 1000 chars):', domString.slice(0, 1000));
 
   async function* getAssets(): AsyncIterableIterator<Asset> {
     for await (const { headers, content } of files) {

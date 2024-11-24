@@ -3,7 +3,6 @@
 A fork of [rePub](https://github.com/hafaio/repub) for Firefox
 
 [![build](https://github.com/jrockwar/repubfox/actions/workflows/build.yml/badge.svg)](https://github.com/jrockwar/repubfox/actions/workflows/build.yml)
-[![chrome](https://img.shields.io/badge/chrome-extension-orange)](https://chrome.google.com/webstore/detail/repub/blkjpagbjaekkpojgcgdapmikoaolpbl)
 [![license](https://img.shields.io/github/license/jrockwar/repubfox)](LICENSE)
 
 ## Info on rePub

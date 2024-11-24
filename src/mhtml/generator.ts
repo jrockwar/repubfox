@@ -85,14 +85,19 @@ function createMHTMLHeader(doc: MHTMLDocument): string {
  * Encodes text as quoted-printable
  */
 function encodeQuotedPrintable(text: string): string {
-  return text.split('').map(char => {
-    const code = char.charCodeAt(0);
-    // If character is non-ASCII or special MIME character, encode it
-    if (code > 127 || char === '=' || char === '.' || char === '\r' || char === '\n') {
-      return '=' + code.toString(16).toUpperCase().padStart(2, '0');
-    }
-    return char;
-  }).join('');
+  return text
+    // First normalize all line endings to CRLF
+    .replace(/\r\n|\n|\r/g, '\r\n')
+    .split('')
+    .map(char => {
+      const code = char.charCodeAt(0);
+      // Only encode non-ASCII and essential MIME special characters
+      if (code > 127 || char === '=' || char === '\r' || char === '\n') {
+        return '=' + code.toString(16).toUpperCase().padStart(2, '0');
+      }
+      return char;
+    })
+    .join('');
 }
 
 /**

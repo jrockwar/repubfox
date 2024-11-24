@@ -15,8 +15,12 @@ node_modules
 /*.mhtml
 /*.zip
 /*.wasm
+/*.xpi
 /out
 /scripts
 /target
 /pkg
 /favicon.ico
+/.amo-upload-uuid
+/web-ext-artifacts
+

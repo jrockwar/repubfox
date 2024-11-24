@@ -1,7 +1,7 @@
 {
-  "name": "rePub",
+  "name": "rePubFox",
   "description": "Converts web pages to epub for remarkable tablet",
-  "version": "4.0.0",
+  "version": "0.1.0",
   "manifest_version": 3,
   "permissions": [
     "tabs",

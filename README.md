@@ -1,7 +1,13 @@
-# rePub
+# rePubFox
 
-[![build](https://github.com/hafaio/repub/actions/workflows/build.yml/badge.svg)](https://github.com/hafaio/repub/actions/workflows/build.yml)
-[![license](https://img.shields.io/github/license/hafaio/repub)](LICENSE)
+A fork of [rePub](https://github.com/hafaio/repub) for Firefox
+
+[![build](https://github.com/jrockwar/repubfox/actions/workflows/build.yml/badge.svg)](https://github.com/jrockwar/repubfox/actions/workflows/build.yml)
+[![license](https://img.shields.io/github/license/jrockwar/repubfox)](LICENSE)
+
+## Info on rePub
+
+https://github.com/hafaio/repub
 
 A reMarkable ePub generator. This is essentially an open source version of
 [Read on reMarkable](https://chrome.google.com/webstore/detail/read-on-remarkable/bfhkfdnddlhfippjbflipboognpdpoeh).
